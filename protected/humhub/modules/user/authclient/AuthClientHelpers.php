@@ -10,6 +10,7 @@ namespace humhub\modules\user\authclient;
 
 use humhub\modules\user\models\Auth;
 use humhub\modules\user\models\User;
+use humhub\modules\user\models\Group;
 use Yii;
 use yii\authclient\ClientInterface;
 use yii\helpers\VarDumper;
@@ -122,7 +123,27 @@ class AuthClientHelpers
         if ($authClient instanceof interfaces\SyncAttributes) {
             $attributes = $authClient->getUserAttributes();
             foreach ($authClient->getSyncAttributes() as $attributeName) {
-                if (isset($attributes[$attributeName])) {
+                if ($attributeName == "groups") {
+
+                    // Add the user in the groups whey they are not yet
+                    foreach ($attributes[$attributeName] as $groupName) {
+                        $group = Group::findOne(['name' => $groupName]);
+                        if (!$group) {
+                            $group = new Group();
+                            $group->name = $groupName;
+                            $group->save();
+                        }
+                        $group->addUser($user);
+                    }
+
+                    // Remove the user from the group they are not anymore
+                    foreach ($user->getGroups() as $group) {
+                        if (!in_array($group->name, $attributes[$attributeName])) {
+                            $group->removeUser($user);
+                        }
+                    }
+                }
+                elseif (isset($attributes[$attributeName])) {
                     if ($user->hasAttribute($attributeName) && !in_array($attributeName, ['id', 'guid', 'status', 'contentcontainer_id', 'auth_mode'])) {
                         $user->setAttribute($attributeName, $attributes[$attributeName]);
                     } else {
